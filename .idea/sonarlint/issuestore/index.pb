@@ -9,9 +9,6 @@ l
 0src/main/java/io/taech/print/PrintableField.java,8\0\802e3e7160e1253631cd97df3c0049b994e602fc
 Y
 )src/main/java/io/taech/print/Wrapper.java,4\5\4581b758aa42e99d76409fe13fbf155b59f552fa
-:
-
-.gitignore,a\5\a5cc2925ca8258af241be7e5b0381edf30266302
 `
 0src/main/java/io/taech/constant/BuilderType.java,d\4\d466d7d58c00b456f685c372513fab4737d98717
 W
@@ -30,3 +27,13 @@ d
 4src/main/java/io/taech/print/builder/RowBuilder.java,c\d\cdb0b14443da0fcee89bd74f3501d980e3a85162
 l
 <src/main/java/io/taech/print/builder/RowBuilderProvider.java,e\b\eb7233f6ceccf2708bff114b543a4a293d07cf48
+\
+,src/main/java/io/taech/util/CommonUtils.java,4\2\429168698835601c7f114b2ca166d3b65446c390
+]
+-src/main/java/io/taech/print/ColumnValue.java,7\6\76aff112bf2effee49b755740868b9cdaa37d4d4
+]
+-src/main/java/io/taech/constant/Resource.java,1\f\1fbc78d49687e0fec356bb6c0b45ab4ce396a2df
+X
+(src/main/java/io/taech/print/Column.java,f\b\fb760cbd1d9db55353506cbc66bafebcc05c84e5
+Z
+*src/main/java/io/taech/util/StopWatch.java,c\6\c6898e035aae3b6b7239f1c04156f0546cbb196d
