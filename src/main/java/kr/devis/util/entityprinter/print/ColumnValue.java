@@ -5,40 +5,36 @@ import kr.devis.util.entityprinter.util.CommonUtils;
 public class ColumnValue {
 
     private final String value;
-    private Integer lineCount;
-    private Integer lineLength;
-    private boolean isMultiLine;
-
     private String firstLine;
+    private int lineCount;
+    private int lineLength;
 
     public ColumnValue(String original) {
         this.value = original;
-        String[] lines = CommonUtils.separateWithLineFeed(original);
-        CommonUtils.getWithSeparate(lines, (count, length) -> {
-            this.lineCount = count;
-            this.lineLength = length;
-            this.isMultiLine = (count > 1);
-        });
-        this.firstLine = lines[0];
+        this.lineCount = 1;
+        this.lineLength = original.length();
+        this.firstLine = original;
     }
 
     public String getValue() {
         return this.value;
     }
 
-    public Integer getLineCount() {
+    public int getLineCount() {
         return this.lineCount;
     }
 
-    public Integer getLineLength() {
+    public int getLineLength() {
         return this.lineLength;
-    }
-
-    public boolean isMultiLine() {
-        return this.isMultiLine;
     }
 
     public String getFirstLine() {
         return this.firstLine;
+    }
+
+    public void applyMultiline(String[] lines) {
+        this.lineCount = lines.length;
+        this.lineLength = CommonUtils.getMaxLength(lines);
+        this.firstLine = lines[0];
     }
 }
