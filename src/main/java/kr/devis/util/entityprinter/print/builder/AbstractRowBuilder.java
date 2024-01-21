@@ -13,10 +13,13 @@ import kr.devis.util.entityprinter.util.CommonUtils;
 
 import java.time.chrono.ChronoLocalDate;
 import java.time.chrono.ChronoLocalDateTime;
+import java.time.temporal.UnsupportedTemporalTypeException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.Map;
+import java.util.stream.Collectors;
+import java.util.stream.IntStream;
 
 import static kr.devis.util.entityprinter.print.handle.KnownCondition.NO_ACTIVATED_MESSAGE;
 
@@ -32,7 +35,7 @@ public abstract class AbstractRowBuilder<I> implements RowBuilder<I> {
     /**
      * 실제로 쌓일 문자열을 담는 StringBuilder
      */
-    protected final StringBuilder builder = new StringBuilder();
+    protected final StringBuilder builder = new StringBuilder(Resource.LINEFEED);
     protected final List<Column> columns = new ArrayList<>();
     /**
      * 컬럼의 정보를 담는 리스트
@@ -83,37 +86,54 @@ public abstract class AbstractRowBuilder<I> implements RowBuilder<I> {
 
     protected final String getStringValue(Object value, final Column column) {
         if (value == null) value = Resource.NULL_VALUE;
+        String typeValue = typeControl(value);
 
-        String strValue = typeControl(value).replaceAll(Resource.IGNORE_LETTER, " ");
-        ColumnValue columnValue = new ColumnValue(typeControl(value));
-        Integer lengthOfValue = columnValue.getLineLength();
+        //이스케이프 문자 그대로 출력
+        String strValue = CommonUtils.escapeWhiteSpace(typeValue);
+        //라인피드로 나눠서 라인개수를 확인하기때문에 replace 되지 않은 값으로 생성.
+        ColumnValue columnValue = new ColumnValue(strValue);
+        int lengthOfValue = strValue.length();
 
-        if (optionAware.isAllowMultiline()) {
-            // multi line 대응 행, 열 길이 계산
-        } else {
-
-            if (lengthOfValue > Resource.DEFAULT_MAX_LENGTH_PER_LINE) {
-                strValue = columnValue.getFirstLine().substring(0, (Resource.DEFAULT_MAX_LENGTH_PER_LINE - Resource.ELLIPSIS.length())) + Resource.ELLIPSIS;
-                lengthOfValue = Resource.DEFAULT_MAX_LENGTH_PER_LINE;
-            }
-
+        if (optionAware.isNoEscape() && !optionAware.isAllowMultiline()) {
+            strValue = typeValue.split(Resource.LINEFEED)[0];
+            lengthOfValue = strValue.length();
         }
 
-        column.setLength(Math.max(column.getLength(), (lengthOfValue + Resource.EACH_SPACE_LENGTH)));
+        if (optionAware.isAllowMultiline()) {
+            String[] lines = optionAware.isNoEscape()
+                    ? CommonUtils.separateWithLineFeed(typeValue.replace("\t", "  "))
+                    : CommonUtils.separateWithSize(strValue, Resource.DEFAULT_MAX_LENGTH_PER_LINE);
+            columnValue.applyMultiline(lines);
+            lengthOfValue = columnValue.getLineLength();
+            if (optionAware.isNoEscape()) {
+                strValue = String.join(Resource.LINEFEED, lines);
+            }
+        }
+
+        //줄임이 아니면서 최대길이를 넘어가면 줄임표를 붙여준다.
+        if (!optionAware.isNoEllipsis() && lengthOfValue > Resource.DEFAULT_MAX_LENGTH_PER_LINE) {
+            strValue = columnValue.getFirstLine().substring(0, (Resource.DEFAULT_MAX_LENGTH_PER_LINE - Resource.ELLIPSIS.length())) + Resource.ELLIPSIS;
+            lengthOfValue = Resource.DEFAULT_MAX_LENGTH_PER_LINE;
+        }
+
+        int maxLength = Math.max(column.getLength(), (lengthOfValue + Resource.EACH_SPACE_LENGTH));
+        column.with(maxLength, columnValue.getLineCount());
 
         return strValue;
     }
 
     private String typeControl(Object value) {
         Object result;
-
-        if (value instanceof ChronoLocalDate)
-            result = ((ChronoLocalDate) value).format(optionAware.getDateFormatter());
-        else if (value instanceof ChronoLocalDateTime)
-            result = ((ChronoLocalDateTime) value).format(optionAware.getDateFormatter());
-        else
-            result = value;
-
+        try {
+            if (value instanceof ChronoLocalDate)
+                result = ((ChronoLocalDate) value).format(optionAware.getDateFormatter());
+            else if (value instanceof ChronoLocalDateTime)
+                result = ((ChronoLocalDateTime) value).format(optionAware.getDateFormatter());
+            else
+                result = value.toString();
+        } catch (UnsupportedTemporalTypeException temporalTypeException) {
+            result = value.toString();
+        }
         return result.toString();
     }
 
@@ -140,16 +160,37 @@ public abstract class AbstractRowBuilder<I> implements RowBuilder<I> {
 
     private void setColumnValues() {
         SuiteFloor suiteFloor = this.floorGenerator.getSuiteFloor();
-        if (this.optionAware.isAllowMultiline()) {
-            return;
-        }
         // 컬럼 값 세팅
         ListIterator<Map<String, String>> mapListIterator = this.columnMapList.listIterator();
 
         while (mapListIterator.hasNext()) {
-            Map<String, String> next = mapListIterator.next();
-            String[] columnValues = CommonUtils.columnValuesOf(this.columns, col -> next.get(col.getName()));
-            this.builder.append(suiteFloor.getRoomWithValues(columnValues));
+            Map<String, String> nextRow = mapListIterator.next();
+            if (optionAware.isAllowMultiline()) {
+                //컬럼중 가장 긴라인을 기준으로 생성
+                int largestLine = this.columns.stream().map(Column::getLine).max(Integer::compareTo).orElse(1);
+                Map<String, String[]> multiLineRow = nextRow.entrySet().stream().collect(Collectors.toMap(
+                        Map.Entry::getKey,
+                        entry -> {
+                            if (optionAware.isNoEscape()) {
+                                return CommonUtils.separateWithLineFeed(entry.getValue());
+                            }
+
+                            return CommonUtils.separateWithSize(entry.getValue(), Resource.DEFAULT_MAX_LENGTH_PER_LINE);
+                        }
+                ));
+
+                IntStream.range(0, largestLine).forEach(line -> {
+                    String[] columnValues = columns.stream().map(col -> {
+                        String[] values = multiLineRow.get(col.getName());
+                        //컬럼 내 라인의 값 없다면 ""
+                        return col.getLine() > line ? values[line] : "";
+                    }).toArray(String[]::new);
+                    this.builder.append(suiteFloor.getRoomWithValues(columnValues));
+                });
+            } else {
+                String[] columnValues = CommonUtils.columnValuesOf(this.columns, col -> nextRow.get(col.getName()));
+                this.builder.append(suiteFloor.getRoomWithValues(columnValues));
+            }
 
             if (optionAware.isWithoutFloor() && (mapListIterator.hasNext())) {
                 continue;

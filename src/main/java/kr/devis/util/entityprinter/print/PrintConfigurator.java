@@ -8,7 +8,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.*;
 import java.util.stream.Collectors;
 
-public class PrintConfigurator<I> {
+public final class PrintConfigurator<I> {
 
     private final Set<PrintOption> options;
     private BuilderType builderType;
@@ -59,7 +59,8 @@ public class PrintConfigurator<I> {
         return this;
     }
 
-    public PrintConfigurator<I> activateFields(final I... fieldIndexes) {
+    @SafeVarargs
+    public final PrintConfigurator<I> activateFields(final I... fieldIndexes) {
         this.activateIndexes = CommonUtils.isNull(fieldIndexes) ? new ArrayList<>() : Arrays.stream(fieldIndexes)
                 .distinct()
                 .sorted()
@@ -69,9 +70,9 @@ public class PrintConfigurator<I> {
     }
 
 
-    public PrintConfigurator<I> dateformat(final DateTimeFormatter dateTimeFormatter) {
-        this.dateTimeFormatter = dateTimeFormatter;
-        this.options.add(PrintOption.DATETIME_FORMAT);
+    public PrintConfigurator<I> dateformat(final String pattern) {
+        this.dateTimeFormatter = DateTimeFormatter.ofPattern(pattern);
+        this.options.add(PrintOption.DATE_FORMAT);
         return this;
     }
 
@@ -87,6 +88,16 @@ public class PrintConfigurator<I> {
 
     public PrintConfigurator<I> applyAll(PrintOption... printOptions) {
         this.options.addAll(Arrays.asList(printOptions));
+        return this;
+    }
+
+    public PrintConfigurator<I> noEscape() {
+        this.options.add(PrintOption.NO_ESCAPE);
+        return this;
+    }
+
+    public PrintConfigurator<I> noEllipsis() {
+        this.options.add(PrintOption.NO_ELLIPSIS);
         return this;
     }
 }
